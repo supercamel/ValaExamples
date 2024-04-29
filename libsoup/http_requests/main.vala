@@ -33,30 +33,32 @@ public class VGet : Application {
         }
         var out_stream = file.create(FileCreateFlags.REPLACE_DESTINATION); // Create or replace the output file
 
-        bool downloading = true;
+        var bytes_total = message.get_response_headers().get_content_length();
         // Asynchronously splice the input stream to the output file
         out_stream.splice_async.begin(stream, 
             GLib.OutputStreamSpliceFlags.CLOSE_TARGET | GLib.OutputStreamSpliceFlags.CLOSE_SOURCE, 
             Priority.DEFAULT, null, 
             (obj, res) => {
                 out_stream.splice_async.end(res); // End splicing upon completion
-                downloading = false; // Update flag when download is complete
         });
 
-        // Retrieve total size of the download for progress reporting
-        var bytes_total = message.get_response_headers().get_content_length();
-        while(downloading) {
-            // Fetch metrics to update progress
+        var timeout = GLib.Timeout.add(1000, () => {
             var metrics = message.get_metrics();
             if(metrics != null) {
-                var bytes_received = metrics.get_response_body_bytes_received();
+                var bytes_received = message.get_metrics().get_response_body_bytes_received();
                 command_line.print("Downloaded %lu of %lu bytes.\n", (ulong)bytes_received, (ulong)bytes_total);
             }
+            return true;
+        });
 
-            yield nap(1000); // Pause for 1 second between progress updates
-        }
+        message.finished.connect(() => {
+            command_line.print("Download finished.\n");
+            // cancel the timeout
+            GLib.Source.remove(timeout);
+            download_file.callback();
+        });
 
-        command_line.print("Download completed successfully.\n");
+        yield;
         return true;  // Return true when the download completes successfully
     }
 
