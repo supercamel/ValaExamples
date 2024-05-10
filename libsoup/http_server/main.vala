@@ -11,21 +11,29 @@ string? get_mime_type(string file_path) {
     }
 }
 
-public class SoupServer : Soup.Server {
-	public SoupServer(uint16 listening_port = 80) {
-        base("");
+public class MySoupServer : Soup.Server {
+	public MySoupServer(uint16 listening_port = 80) {
         listen_all(listening_port, Soup.ServerListenOptions.IPV4_ONLY);
 
         add_handler("/api/demo", (server, msg, path, query) => {
-            var response = "{\"demo\": \"demo\"}";
-            msg.set_response("application/json", Soup.MemoryUse.COPY, response.data);
+            if(msg.get_method() == "GET") {
+                var response = "{\"demo\": \"demo\"}";
+                msg.set_response("application/json", Soup.MemoryUse.COPY, response.data);
+            }
+            else if(msg.get_method() == "POST") {
+                var body = msg.get_request_body();
+                stdout.printf("Body: %s\n", (string)body.data);
+                var response = "{\"demo\": \"demo\"}";
+                msg.set_response("application/json", Soup.MemoryUse.COPY, response.data);
+            }
+            // PUT, DELETE, etc
         });
 
         add_handler(null, default_handler);
 	}
 
     private static void default_handler(Soup.Server server, Soup.ServerMessage msg, string path, GLib.HashTable<string, string>? query) {
-        var self = server as SoupServer;
+        var self = server as MySoupServer;
         stdout.printf("Serving file: " + path + "\n");
         
         if (path == "/") {
@@ -56,8 +64,8 @@ public class SoupServer : Soup.Server {
         GLib.MainLoop loop = new GLib.MainLoop();
 
         stdout.printf("Starting ...\n");
- 		SoupServer server = new SoupServer ();
-        stdout.printf("Server started at http://127.0.0.1:80\n");
+ 		var server = new MySoupServer (8888);
+        stdout.printf("Server started at http://127.0.0.1:8888\n");
         stdout.flush();
 
         loop.run();
