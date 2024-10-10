@@ -4,7 +4,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from exllamav2 import ExLlamaV2, ExLlamaV2Config, ExLlamaV2Cache, ExLlamaV2Tokenizer, Timer
 from exllamav2.generator import ExLlamaV2DynamicGenerator
 
-model_dir = "/media/sam/New Volume/AIModels/llama3.1-8b-instruct"
+#model_dir = "/media/sam/New Volume/AIModels/llama3.1-8b-instruct"
+model_dir = "/media/sam/New Volume/AIModels/QwenCoder-7b-exl2"
 #model_dir = "/media/sam/New Volume/AIModels/turboderp_Llama-3-8B-Instruct-exl2_4.0bpw"
 config = ExLlamaV2Config(model_dir)
 config.arch_compat_overrides()
@@ -21,7 +22,8 @@ generator = ExLlamaV2DynamicGenerator(
     model = model,
     cache = cache,
     tokenizer = tokenizer,
-    decode_special_tokens = True 
+    decode_special_tokens = True,
+    paged = False
 )
 
 max_new_tokens = 4096
@@ -55,9 +57,32 @@ def convert_openai_to_llama31(openai_prompt):
 
     return llama_prompt
 
+def convert_openai_to_qwen(messages):
+    qwen_prompt = ""
+    role_map = {
+        "system": "system",
+        "user": "user",
+        "assistant": "assistant",
+        "ipython": "ipython"  # In case you need ipython role
+    }
+
+    qwen_prompt = "<|im_start|>system\nYou are a helpful AI assistant.\n<|im_end|>\n"
+    for message in messages:
+        role = message.get("role", "user")
+        content = message.get("content", "")
+        
+        # Convert OpenAI roles to qwen format
+        qwen_prompt += f"<|im_start|>{role}\n{content}\n<|im_end|>\n"
+    qwen_prompt += "<|im_start|>system\n"
+    return qwen_prompt
+
 def tryMessages(messages):
-    llama31_prompt = convert_openai_to_llama31(messages)
-    output = generator.generate(prompt = llama31_prompt, max_new_tokens = max_new_tokens, add_bos = True, completion_only = True, stop_conditions =  [tokenizer.single_id("<|eot_id|>")])
+    #llama31_prompt = convert_openai_to_llama31(messages)
+    #output = generator.generate(prompt = llama31_prompt, max_new_tokens = max_new_tokens, add_bos = True, completion_only = True, stop_conditions =  [tokenizer.single_id("<|eot_id|>")])
+    prompt = convert_openai_to_qwen(messages)
+    output = generator.generate(prompt = prompt, max_new_tokens = max_new_tokens, add_bos = True, completion_only = True, stop_conditions =  [tokenizer.single_id("<|im_end|>")])
+    # strip leading and trailing whitespace
+    output = output.strip()
     return output
 
 def tryMessageBatch(batch):
